@@ -1,0 +1,429 @@
+<html>
+
+<head>
+  <title>
+    Food Access and Chronic Illness in the US
+  </title>
+  <script src="https://d3js.org/d3.v5.min.js"></script>
+  <link href="https://fonts.googleapis.com/css?family=Nunito|Spartan&display=swap" rel="stylesheet">
+</head>
+
+<body>
+  <h1>
+    Food Access and Chronic Illness in the US
+  </h1>
+  <p class="infoBlock">
+    Food Security is a widespread issue in the US. It is estimated that 1 in 9
+    Americans suffer from food insecurity of some form (US Dept.of Agriculture). This issue
+    does not only cause hunger rates to rise it, is also closely related to housing, social,
+    and health issues. There are many layers of food security but in this analysis we focus on food
+    access which the national census quantifies by a persons ability to reach a store that sells food
+    within a 10 mile radius of their home. The data representing Food Access in this Analysis is this quantity.
+    <h2>
+      Food Access and Obesity Rates State Wide
+    </h2>
+    <p class="infoBlock">
+      This histogram shows the numbers of those suffering from obesity (green) and those
+      suffering from lack of food access in a 10 mile radius (orange).
+    </p>
+
+    <p id="p1">
+      <style>
+        h1,
+        h2,
+        .label {
+          color: #264653;
+          font-family: 'Spartan', sans-serif;
+          font-weight: bold;
+          padding-left: 10;
+          padding-top: 20;
+        }
+
+        .infoBlock {
+          color: #264653;
+          font-family: 'Nunito', sans-serif;
+          padding-left: 20;
+          margin-top: -15;
+          margin-right: 150;
+        }
+
+        text {
+          color: #264653;
+          font-family: 'Spartan', sans-serif;
+        }
+
+        .axisRed line {
+          stroke: #F4A261;
+        }
+
+        .axisRed path {
+          stroke: #F4A261;
+        }
+
+        .axisRed text {
+          fill: #F4A261;
+        }
+
+        .axisGreen line {
+          stroke: #2A9D8F;
+        }
+
+        .axisGreen path {
+          stroke: #2A9D8F;
+        }
+
+        .axisGreen text {
+          fill: #2A9D8F;
+        }
+      </style>
+
+      <script>
+        var distinct_cities = [];
+        var files = ["food_access.csv", "cities.csv", "uscities.csv"];
+        var foodPer = 0;
+        var diseaseCount = 0;
+        var food_obj = {};
+        var distinct_states = ['AL', 'AK', 'AS', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'DC', 'FM', 'FL', 'GA', 'GU', 'HI', 'ID', 'IL', 'IN',
+          'IA', 'KS', 'KY', 'LA', 'ME', 'MH', 'MD', 'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ', 'NM', 'NY', 'NC',
+          'ND', 'MP', 'OH', 'OK', 'OR', 'PW', 'PA', 'PR', 'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VT', 'VI', 'VA', 'WA', 'WV',
+          'WI', 'WY'
+        ];
+        Promise.all([
+          d3.csv("food_access.csv"),
+          d3.csv("cities.csv"),
+          d3.csv("uscities.csv")
+        ]).then(function(files) {
+          // files[0] will contain file1.csv
+          // files[1] will contain file2.csv
+          // total people in New York in have low food access(regardless of counties)
+          var distinct_cities = []
+          var disease_obj = {};
+          var cities = files[1]
+          cities.forEach((d, i) => {
+            let state = d.StateAbbr;
+            let disease = d.MeasureId;
+            let year = d.Year;
+            let location = d.GeographicLevel;
+            let percent = Number(d.Data_Value)
+            if (disease == "OBESITY" && year == "2017" && location == 'City') {
+              diseaseCount = Number(d.PopulationCount);
+              var realcount = (percent * diseaseCount) / 100;
+              disease_obj[state] = (disease_obj[state] + realcount) || realcount;
+              if (distinct_cities.includes(d.CityName) == false) {
+                distinct_cities.push(d.CityName)
+              }
+            }
+          })
+
+          // total people in New York in have obesity in 2017(regardless of counties)
+          //Code to match counties in food_access to cities in disease csv
+          var country_city = files[2]
+          var dict = {};
+          var temp_list = [];
+
+          //initialze empty object with 'state: counties list'
+          for (i = 0; i < distinct_states.length; i++) {
+            dict[distinct_states[i]] = new Array();
+          }
+
+          //Loop through dataset populating object
+          country_city.forEach((d, i) => {
+            let city = d.city;
+            let county = d.county_name;
+            let state = d.state_id;
+            if (distinct_cities.includes(city)) {
+              dict[state].push(county)
+            }
+          })
+          var cities = files[0]
+          cities.forEach((d, i) => {
+            var temp = d.State;
+            var county = d.County;
+            // I change the column V to "LowAccess" for coding convenience
+            foodPer = Number(d.LowAccessPercents);
+            var pop = Number(d.Population);
+            var counties_list = dict[temp];
+            //If the county we are looking at is in our list of counties that are in the state we are looking at
+            if (counties_list.includes(county)) {
+              var foodCount = (foodPer * pop) / 100;
+              food_obj[temp] = (food_obj[temp] + foodCount) || foodCount;
+            }
+          })
+          //Set up svg area
+          var height = 600;
+          var width = 1040;
+          var svg = d3.select("#p1")
+            .append("svg")
+            .attr("width", width)
+            .attr("height", height);
+
+          // Get max values of food_access and disease counts
+          let arr = Object.values(food_obj);
+          var food_min = Math.min(...arr);
+          var food_max = Math.max(...arr);
+          let arr2 = Object.values(disease_obj);
+          var disease_min = Math.min(...arr2);
+          var disease_max = Math.max(...arr2);
+
+          // Take highest of two
+          var max_of_two = Math.max(disease_max, food_max);
+          // Make a linear scale for y axis and an ordinal scale for x axis
+          formatValue = d3.format(".2s");
+          const y_scale = d3.scaleLinear()
+            .domain([0, food_max])
+            .range([height - 40, 5]);
+
+          const y_scale2 = d3.scaleLinear()
+            .domain([0, disease_max])
+            .range([height - 40, 5]);
+
+          const x_scale = d3.scalePoint()
+            .domain(['AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'DC', 'FL', 'GA', 'HI', 'ID', 'IL', 'IN',
+              'IA', 'KS', 'KY', 'LA', 'ME', 'MD', 'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ', 'NM', 'NY', 'NC',
+              'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV',
+              'WI', 'WY'
+            ])
+            .range([75, width - 75]);
+
+          //Make axises using scales
+          var x_axis = d3.axisBottom()
+            .scale(x_scale)
+            .ticks(50);
+          var y_axis = d3.axisLeft()
+            .ticks(10)
+            .tickFormat(function(d) {
+              return formatValue(d)
+            })
+            .scale(y_scale);
+          var y_axis2 = d3.axisRight()
+            .ticks(10)
+            .tickFormat(function(d) {
+              return formatValue(d)
+            })
+            .scale(y_scale2);
+          //Create the grid using scales
+          // ticksize  = height(300) - margin top(20) - margin bottom(20)=260
+          const xAxisGrid = d3.axisBottom(x_scale).tickSize(-300).tickFormat('');
+          const yAxisGrid = d3.axisLeft(y_scale).tickSize(-914).tickFormat('');
+          const yAxisGrid2 = d3.axisRight(y_scale2).tickSize(-914).tickFormat('');
+          // Add the grids and axises to the svg area
+          // x scale(label)
+          var bandSize = x_scale.bandwidth();
+          svg.append("g")
+            .attr("transform", "translate(" + 0 + ", " + (height - 40) + ")")
+            .call(x_axis)
+            .selectAll("text")
+            .attr("transform", "translate(" + bandSize + ", 0)");
+
+
+
+          svg.append("g")
+            .attr("transform", "translate(67,0)")
+            .style("font-size", "10px")
+            .attr("class", "axisRed")
+            .call(y_axis);
+          svg.append("g")
+            .attr("transform", "translate(980,0)")
+            .style("font-size", "10px")
+            .attr("class", "axisGreen")
+            .call(y_axis2);
+          svg.append('g')
+            .attr("transform", "translate(67,0)")
+            .attr('class', 'y axis-grid')
+            .attr("class", "axisRed")
+            .style("opacity", 0.5)
+            .style("stroke-dasharray", ("3, 3"))
+            .call(yAxisGrid);
+          svg.append('g')
+            .attr("transform", "translate(980,0)")
+            .attr('class', 'y axis-grid')
+            .attr("class", "axisGreen")
+            .style("opacity", 0.5)
+            .style("stroke-dasharray", ("3, 3"))
+            .call(yAxisGrid2);
+          d3.select("g.tick")
+            .selectAll("text")
+            .style("text-anchor", "middle");
+          svg.append("text")
+            .attr("transform", "translate(30,300) rotate(90)")
+            .attr("dy", "1em")
+            .style("font-size", "15px")
+            .style("text-anchor", "middle")
+            .style("fill", "darkorange")
+            .text("Number of people with low food access.");
+          svg.append("text")
+            .attr("transform", "translate(1043,300) rotate(90)")
+            .attr("dy", "1em")
+            .style("font-size", "15px")
+            .style("text-anchor", "middle")
+            .style("fill", "darkgreen")
+            .text("Number of people diagnosed with obesity.");
+          svg.append("text")
+            .attr("transform", "translate(" + (width / 2) + " ," +
+              (595) + ")")
+            .style("text-anchor", "middle")
+            .text("U.S States (Abbreviated)");
+
+          svg.append("circle").attr("cx", 450).attr("cy", 20).attr("r", 6).style("fill", "#F4A261")
+          svg.append("circle").attr("cx", 450).attr("cy", 38).attr("r", 6).style("fill", "#2A9D8F")
+          svg.append("text").attr("x", 470).attr("y", 20).text("People who live more than 10 miles away from fresh food.").style("font-size", "15px").attr("alignment-baseline", "middle")
+          svg.append("text").attr("x", 470).attr("y", 38).text("People who have been diagnosed with obesity.").style("font-size", "15px").attr("alignment-baseline", "middle")
+
+          for (const [key, value] of Object.entries(food_obj)) {
+            svg.append("rect")
+              .attr("transform", "translate(" + 8 + ", " + -20 + ")")
+              .attr("x", x_scale(key) - 6)
+              .attr("y", y_scale(value))
+              .attr("width", 8)
+              .attr("height", (height - 20 - y_scale(value)))
+              .style("opacity", 0.6)
+              .style("fill", "#2A9D8F");
+          }
+
+          for (const [key, value] of Object.entries(disease_obj)) {
+            svg.append("rect")
+              .attr("transform", "translate(" + 0 + ", " + -20 + ")")
+              .attr("x", x_scale(key) - 6)
+              .attr("y", y_scale2(value))
+              .attr("width", 8)
+              .attr("height", (height - 20 - y_scale2(value)))
+              .style("opacity", 0.6)
+              .style("fill", "#F4A261");
+          }
+        }).catch(function(err) {
+          // handle error here
+          console.log(err)
+        })
+      </script>
+    </p>
+
+    <h2>
+      Chronic Illness Variation Across States
+    </h2>
+
+    <p class="infoBlock">
+      This heat map depicts the percentages of people with various chronic
+      illnesses in each state, ordered by food access.
+    </p>
+    <p id="p2">
+      <script>
+        Promise.all([
+            d3.csv("food_access.csv"),
+            d3.csv("cities.csv")
+          ]).then(function(files) {
+            //VISUALIZATION #2 Starts
+            //Setting up SVG element
+            var height2 = 600;
+            var width2 = 800;
+            var margins = {
+              top: 10,
+              right: 10,
+              bottom: 50,
+              left: 300
+            };
+            var graphWidth = width2 - margins.left - margins.right;
+            var graphHeight = height2 - margins.top - margins.bottom;
+
+            var svg2 = d3.select("#p2")
+              .append("svg")
+              .attr("width", width2)
+              .attr("height", height2);
+            let annotations = svg2.append('g').attr('id', 'annotations');
+            let graph = svg2.append("g")
+              .attr("width", graphWidth)
+              .attr('height', graphHeight)
+              .attr("transform", "translate(" + margins.left + ", " + margins.top + ")");
+            //Sort food objects to orde the y-axis
+            let statesSorted = Object.keys(food_obj).sort(function(a, b) {
+              return food_obj[a] - food_obj[b]
+            })
+
+            let chronics = ['OBESITY', 'HIGHCHOL', 'DIABETES', 'CANCER'];
+            //Create a data set( object) that holds {state: , desies: , value: }
+            var heatData = [];
+            var data = files[1];
+            data.forEach((d, i) => {
+              if (d.Year == 2017) {
+                if (d.MeasureId == 'OBESITY' || d.MeasureId == 'HIGHCHOL' || d.MeasureId == 'DIABETES' || d.MeasureId == 'CANCER' && d.GeographicLevel == "City") {
+                  var obj = {
+                    'state': d.StateAbbr,
+                    'disease': d.MeasureId,
+                    'value': d.Data_Value
+                  };
+                  heatData.push(obj);
+                };
+              };
+            });
+
+            // Scale creation
+            let scaleStates = d3.scaleBand().domain(statesSorted).range([graphHeight, 0]).padding(0.01);
+            let scaleChronic = d3.scaleBand().domain(chronics).range([0, graphWidth]).padding(0.01);
+            let scaleColor = d3.scaleLinear().range(["white", "#2A9D8F"]).domain([1, 100]);
+            //Axis Creation
+            annotations.append("g")
+              .attr("class", "y axis")
+              .attr('transform', "translate(" + (margins.left - 1) + "," + margins.top + ")")
+              .call(d3.axisLeft(scaleStates));
+            annotations.append("g")
+              .attr("class", "x axis")
+              .attr('transform', "translate(" + margins.left + "," + (graphHeight + margins.top + 1) + ")")
+              .call(d3.axisBottom(scaleChronic));
+
+            //Axis Labels
+            annotations.append("text")
+              .attr("class", "label")
+              .attr("y", (graphHeight + 55))
+              .attr("x", (width2 / 2 + 140))
+              .style("text-anchor", "middle")
+              .text("Chronic Illness");
+            annotations.append('text')
+              .attr("class", 'label')
+              .attr("text-anchor", "end")
+              .attr("x", -150)
+              .attr("y", 210)
+              .attr('transform', 'rotate(-90)')
+              .text("States in order of Food Access");
+            //Creation of graph
+            graph.selectAll()
+              .data(heatData)
+              .enter()
+              .append("rect")
+              .attr("y", d => scaleStates(d['state']))
+              .attr("x", d => scaleChronic(d['disease']))
+              .attr("width", scaleChronic.bandwidth())
+              .attr("height", scaleStates.bandwidth())
+              .style("stroke-width", 0.2)
+              .style("stroke", 'lightgrey')
+              .style("fill", d => scaleColor(d['value']));
+            //ARROW for food access
+            // svg2.append("rect")
+            //   .attr('x', 230)
+            //   .attr('y', margins.top)
+            //   .attr('width', 20)
+            //   .attr('height', graphHeight - 50)
+            //   .style('fill', '#F4A261');
+            // svg2.append("text")
+            //   .attr("class", 'label')
+            //   .attr("text-anchor", "end")
+            //   .attr("x", -20)
+            //   .attr("y", 243)
+            //   .attr('transform', 'rotate(-90)')
+            //   .style("fill", "white")
+            //   .style('font-size', "9px")
+            //   .text("Access to Food");
+            // svg2.append('polygon')
+            //   .attr("points", "220,500 260,500 240,550")
+            //   .style("fill", 'F4A261');
+          })
+          .catch(function(err) {
+            // handle error here
+            console.log(err)
+          });
+      </script>
+    </p>
+
+
+
+</body>
+
+</html>
